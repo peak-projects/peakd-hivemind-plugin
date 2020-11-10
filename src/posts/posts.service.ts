@@ -4,9 +4,56 @@ import { Sequelize } from 'sequelize-typescript';
 import { prepare } from 'src/utils/strings';
 import { HivePost } from './models/hive-post.model';
 
+const POST_SELECT = `
+SELECT
+  coalesce(v.votes, '[]'::json) as active_votes
+  , p.author
+  , CASE p.is_paidout
+      WHEN true THEN (p.payout::decimal - split_part(p.curator_payout_value, ' ', 1)::decimal) || ' HBD'
+      ELSE (p.pending_payout::decimal - split_part(p.curator_payout_value, ' ', 1)::decimal) || ' HBD'
+    END as author_payout_value
+  , p.author_rep as author_reputation
+  , CASE coalesce(p.role_id, 0)
+      WHEN -2 THEN 'muted'
+      WHEN  2 THEN 'member'
+      WHEN  4 THEN 'mod'
+      WHEN  6 THEN 'admin'
+      WHEN  8 THEN 'owner'
+      ELSE 'guest'
+    END as author_role
+  , p.role_title as author_title
+  , p.beneficiaries
+  , null as blacklists
+  , p.body
+  , p.category
+  , p.children
+  , p.community_name as community
+  , p.community_title
+  , p.created_at as created
+  , p.curator_payout_value
+  , p."depth"
+  , p.is_paidout
+  , p."json"::json as json_metadata
+  , p.max_accepted_payout
+  , p.rshares::int8 as net_rshares
+  , p.payout::numeric
+  , p.payout_at
+  , p.pending_payout || ' HBD' as pending_payout_value
+  , p.percent_hbd
+  , p.permlink
+  , p.id as post_id
+  , p.promoted || ' HBD' as promoted
+  , '[]'::json as replies
+  , json_build_object('total_votes', p.total_votes) as stats
+  , p.title
+  , p.updated_at as updated
+  , p.url
+`;
+
 const FEED_BY_AUTHORS = `
-SELECT p.*
+${POST_SELECT}
 FROM hive_posts_view p
+LEFT JOIN LATERAL (select json_agg(json_build_object('voter', v.voter, 'rshares', v.rshares)) as votes from hive_votes_view v where v.post_id = p.id) as v ON true
 where p.depth = 0
   and p.author in ('{authors}')
 order by p.created_at desc
@@ -15,10 +62,10 @@ offset {offset}
 `;
 
 const POSTS_BY_PERMLINKS = `
-SELECT p.*,
-	     h.author_s_permlink
-FROM hive_posts_view p
-JOIN hive_posts_api_helper h on h.id = p.id
+${POST_SELECT}
+FROM hive_posts_api_helper h
+JOIN hive_posts_view p on p.id = h.id
+LEFT JOIN LATERAL (select json_agg(json_build_object('voter', v.voter, 'rshares', v.rshares)) as votes from hive_votes_view v where v.post_id = p.id) as v ON true
 WHERE p.depth = 0
       and h.author_s_permlink in ('{permlinks}')
 `;
