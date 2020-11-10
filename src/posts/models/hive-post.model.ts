@@ -1,7 +1,7 @@
 import { Column, Model, Table } from 'sequelize-typescript';
 
 @Table
-export class Post extends Model<Post> {
+export class HivePost extends Model<HivePost> {
   @Column
   author: string;
 

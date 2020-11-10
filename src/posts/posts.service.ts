@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
 import { Sequelize } from 'sequelize-typescript';
 import { prepare } from 'src/utils/strings';
-import { Post } from './models/post.model';
+import { HivePost } from './models/hive-post.model';
 
 const FEED_BY_AUTHORS = `
 SELECT p.*
@@ -27,23 +27,23 @@ const PAGE_SIZE = 20;
 
 @Injectable()
 export class PostsService {
-  constructor(private sequelize: Sequelize, @InjectModel(Post) private postModel: typeof Post) {}
+  constructor(private sequelize: Sequelize, @InjectModel(HivePost) private postModel: typeof HivePost) {}
 
-  async feedByAuthors(authors: string[], page: number = 0): Promise<Post[]> {
+  async feedByAuthors(authors: string[], page: number = 0): Promise<HivePost[]> {
     const query = prepare(FEED_BY_AUTHORS, {
       authors: authors.join('\',\''),
       offset: page * PAGE_SIZE,
       limit: PAGE_SIZE
     });
     return await this.sequelize.query(query, {
-      model: Post
+      model: HivePost
     });
   }
 
-  async postsByPermlinks(permlinks: string[]): Promise<Post[]> {
+  async postsByPermlinks(permlinks: string[]): Promise<HivePost[]> {
     const query = prepare(POSTS_BY_PERMLINKS, { permlinks: permlinks.join('\',\'') });
     return await this.sequelize.query(query, {
-      model: Post
+      model: HivePost
     });
   }
 }

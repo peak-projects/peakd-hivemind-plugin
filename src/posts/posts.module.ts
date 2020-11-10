@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
 import { SequelizeModule } from '@nestjs/sequelize';
-import { Post } from './models/post.model';
+import { HivePost } from './models/hive-post.model';
 import { PostsController } from './posts.controller';
 import { PostsService } from './posts.service';
 
 @Module({
-    imports: [SequelizeModule.forFeature([Post])],
+    imports: [SequelizeModule.forFeature([HivePost])],
     providers: [PostsService],
     controllers: [PostsController],
   })
