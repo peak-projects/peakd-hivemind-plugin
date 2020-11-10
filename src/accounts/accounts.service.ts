@@ -11,17 +11,16 @@ select suggested."name" as suggestion
      , (log(main.score * 100) + (0.5 * main.score)) * log(1500000 / suggested.followers) "rank"
 from (
 	select a."name"
-		 , a.id
 		 , suggestion."following"
-		 , count(*)::decimal / max(count(*)) OVER (PARTITION BY a.id) as score
+		 , count(*)::decimal / max(count(*)) OVER (PARTITION BY a."name") as score
 	from hive_accounts a
 	join hive_follows base on base.follower = a.id and base.state = 1
 	join hive_follows suggestion on suggestion.follower = base."following" and suggestion.state = 1
 	left join hive_follows excluded on excluded.follower = a.id and excluded."following" = suggestion."following" and excluded.state > 0
-	where excluded.id is null
+	where excluded."following" is null
 	and a.id != suggestion."following"
 	and a."name" = '{account}'
-	group by a."name", a.id, suggestion."following"
+	group by a."name", suggestion."following"
 ) main
 join hive_accounts suggested on suggested.id = main."following"
 order by "rank" desc
