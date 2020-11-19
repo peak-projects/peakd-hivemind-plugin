@@ -7,14 +7,25 @@ import {
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import compression from 'fastify-compress';
 import helmet from 'fastify-helmet';
+import * as fs from 'fs';
+import { config } from 'process';
 import { AppModule } from './app.module';
 
 declare const module: any;
 
 async function bootstrap() {
+  const httpsOptions = fs.existsSync('./secrets/private.pem') && fs.existsSync('./secrets/public.pem')
+    ? {
+      https: {
+        key: fs.readFileSync('./secrets/private.pem'),
+        cert: fs.readFileSync('./secrets/public.pem'),
+      }
+    }
+    : {}
+
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
-    new FastifyAdapter({ logger: true })
+    new FastifyAdapter({ ...httpsOptions, logger: true })
   );
 
   const options = new DocumentBuilder()
@@ -30,7 +41,9 @@ async function bootstrap() {
   app.enableCors();
 
   const configService = app.get(ConfigService);
-  await app.listen(configService.get('port'), '0.0.0.0');
+  const port = configService.get('port') || 3000;
+
+  await app.listen(port, '0.0.0.0');
 
   if (module.hot) {
     module.hot.accept();

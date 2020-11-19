@@ -1,5 +1,6 @@
 export default () => ({
   port: parseInt(process.env.PEAKD_PLUGIN_PORT, 10) || 3000,
+  useHttps: process.env.PEAKD_PLUGIN_ENABLE_HTTPS === 'true',
   database: {
     host: process.env.PEAKD_PLUGIN_DB_HOST || 'localhost',
     port: parseInt(process.env.PEAKD_PLUGIN_DB_PORT, 10) || 5432,
