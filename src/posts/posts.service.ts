@@ -47,31 +47,25 @@ const POST_SELECT = `SELECT coalesce(v.votes, '[]'::json) as active_votes
   , p.updated_at as updated
   , p.url`;
 
-const FEED_BY_AUTHORS = `WITH author_ids AS (
-    SELECT id
-    FROM hive_accounts
-    where "name" in ('{authors}')
-  ),
-  post_ids as (
-    select id
-    from hive_posts
-    where author_id in (select id from author_ids)
-      and "depth" = 0
-      and ({start} = 0 or id < {start})
-    order by id desc
-    limit {limit}
-  )
+const FEED_BY_AUTHORS = `WITH posts as (
+  select p.*
+  from hive_posts_api_helper h
+  join hive_posts_view p on p.id = h.id
+  where split_part(h.author_s_permlink, '/', 1) in ('{authors}')
+    and p."depth" = 0
+    and ({start} = 0 or p.id < {start})
+  order by h.id desc
+  limit {limit}
+)
 ${POST_SELECT}
-FROM post_ids ids
-JOIN hive_posts_view p on ids.id = p.id
+FROM posts p
 LEFT JOIN LATERAL(
-  select v.post_id, json_agg(json_build_object('voter', a."name", 'rshares', v.rshares)) as votes
-  from hive_votes v
-  join hive_accounts a on a.id = v.voter_id
-  where v.post_id in (select id from post_ids)
-  group by v.post_id) as v ON v.post_id = ids.id
-order by p.id desc
-limit {limit}`;
+	select v.post_id, json_agg(json_build_object('voter', a."name", 'rshares', v.rshares)) as votes
+	from hive_votes v
+	join hive_accounts a on a.id = v.voter_id
+	where v.post_id in (select id from posts)
+	group by v.post_id) as v ON v.post_id = p.id
+order by p.id desc`;
 
 const POSTS_BY_PERMLINKS = `${POST_SELECT}
 FROM hive_posts_api_helper h
