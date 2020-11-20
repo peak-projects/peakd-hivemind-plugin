@@ -53,7 +53,11 @@ SELECT
 const FEED_BY_AUTHORS = `
 ${POST_SELECT}
 FROM hive_posts_view p
-LEFT JOIN LATERAL (select json_agg(json_build_object('voter', v.voter, 'rshares', v.rshares)) as votes from hive_votes_view v where v.post_id = p.id) as v ON true
+LEFT JOIN LATERAL(
+	select json_agg(json_build_object('voter', a."name", 'rshares', v.rshares)) as votes
+	from hive_votes v
+	join hive_accounts a on a.id = v.voter_id
+	where v.post_id = p.id) as v ON true
 where p.depth = 0
   and p.author in ('{authors}')
 order by p.created_at desc
@@ -65,7 +69,11 @@ const POSTS_BY_PERMLINKS = `
 ${POST_SELECT}
 FROM hive_posts_api_helper h
 JOIN hive_posts_view p on p.id = h.id
-LEFT JOIN LATERAL (select json_agg(json_build_object('voter', v.voter, 'rshares', v.rshares)) as votes from hive_votes_view v where v.post_id = p.id) as v ON true
+LEFT JOIN LATERAL(
+	select json_agg(json_build_object('voter', a."name", 'rshares', v.rshares)) as votes
+	from hive_votes v
+	join hive_accounts a on a.id = v.voter_id
+	where v.post_id = p.id) as v ON true
 WHERE p.depth = 0
       and h.author_s_permlink in ('{permlinks}')
 `;
