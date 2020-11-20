@@ -25,7 +25,7 @@ async function bootstrap() {
 
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
-    new FastifyAdapter({ ...httpsOptions, logger: true })
+    new FastifyAdapter({ ...httpsOptions, logger: true, maxParamLength: 2000 })
   );
 
   const options = new DocumentBuilder()
