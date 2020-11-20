@@ -8,8 +8,12 @@ export class PostsController {
   constructor(private readonly postsService: PostsService) {}
 
   @Get('/feed/:authors')
-  async getFeedByAuthors(@Param('authors') authors, @Query('page') page): Promise<HivePost[]> {
-    return await this.postsService.feedByAuthors(authors.split(','), page);
+  async getFeedByAuthors(@Param('authors') authors, @Query('start') start, @Query('limit') limit = 20): Promise<HivePost[]> {
+    return await this.postsService.feedByAuthors(
+      authors.split(','),
+      start > 0 ? start : 0,
+      limit > 0 && limit <= 20 ? limit : 20
+    );
   }
 
   @Get('/posts')

@@ -4,9 +4,7 @@ import { Sequelize } from 'sequelize-typescript';
 import { prepare } from 'src/utils/strings';
 import { HivePost } from './models/hive-post.model';
 
-const POST_SELECT = `
-SELECT
-  coalesce(v.votes, '[]'::json) as active_votes
+const POST_SELECT = `SELECT coalesce(v.votes, '[]'::json) as active_votes
   , p.author
   , CASE p.is_paidout
       WHEN true THEN (p.payout::decimal - split_part(p.curator_payout_value, ' ', 1)::decimal) || ' HBD'
@@ -47,26 +45,35 @@ SELECT
   , json_build_object('total_votes', p.total_votes) as stats
   , p.title
   , p.updated_at as updated
-  , p.url
-`;
+  , p.url`;
 
-const FEED_BY_AUTHORS = `
+const FEED_BY_AUTHORS = `WITH author_ids AS (
+    SELECT id
+    FROM hive_accounts
+    where "name" in ('{authors}')
+  ),
+  post_ids as (
+    select id
+    from hive_posts
+    where author_id in (select id from author_ids)
+      and "depth" = 0
+      and ({start} = 0 or id < {start})
+    order by id desc
+    limit {limit}
+  )
 ${POST_SELECT}
-FROM hive_posts_view p
+FROM post_ids ids
+JOIN hive_posts_view p on ids.id = p.id
 LEFT JOIN LATERAL(
-	select json_agg(json_build_object('voter', a."name", 'rshares', v.rshares)) as votes
-	from hive_votes v
-	join hive_accounts a on a.id = v.voter_id
-	where v.post_id = p.id) as v ON true
-where p.depth = 0
-  and p.author in ('{authors}')
-order by p.created_at desc
-limit {limit}
-offset {offset}
-`;
+  select v.post_id, json_agg(json_build_object('voter', a."name", 'rshares', v.rshares)) as votes
+  from hive_votes v
+  join hive_accounts a on a.id = v.voter_id
+  where v.post_id in (select id from post_ids)
+  group by v.post_id) as v ON v.post_id = ids.id
+order by p.id desc
+limit {limit}`;
 
-const POSTS_BY_PERMLINKS = `
-${POST_SELECT}
+const POSTS_BY_PERMLINKS = `${POST_SELECT}
 FROM hive_posts_api_helper h
 JOIN hive_posts_view p on p.id = h.id
 LEFT JOIN LATERAL(
@@ -75,8 +82,7 @@ LEFT JOIN LATERAL(
 	join hive_accounts a on a.id = v.voter_id
 	where v.post_id = p.id) as v ON true
 WHERE p.depth = 0
-      and h.author_s_permlink in ('{permlinks}')
-`;
+      and h.author_s_permlink in ('{permlinks}')`;
 
 const PAGE_SIZE = 20;
 
@@ -84,11 +90,11 @@ const PAGE_SIZE = 20;
 export class PostsService {
   constructor(private sequelize: Sequelize, @InjectModel(HivePost) private postModel: typeof HivePost) {}
 
-  async feedByAuthors(authors: string[], page: number = 0): Promise<HivePost[]> {
+  async feedByAuthors(authors: string[], start: number = 0, limit: number = 20): Promise<HivePost[]> {
     const query = prepare(FEED_BY_AUTHORS, {
       authors: authors.join('\',\''),
-      offset: page * PAGE_SIZE,
-      limit: PAGE_SIZE
+      start: start,
+      limit: limit
     });
     return await this.sequelize.query(query, {
       model: HivePost
