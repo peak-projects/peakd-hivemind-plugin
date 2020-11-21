@@ -19,12 +19,10 @@ npm run start
 Supported configuration using both environment variables or a `.env` file. Use `env.sample` as a reference configuration.
 
 ```
-# Port (default: 3000)
-PORT=3000
-# Database configuration
-DATABASE_HOST=localhost
-DATABASE_PORT=5432
-DATABASE_NAME=hive
-DATABASE_USER=
-DATABASE_PWD=
+PEAKD_PLUGIN_PORT=3000
+PEAKD_PLUGIN_DB_HOST=localhost
+PEAKD_PLUGIN_DB_PORT=5432
+PEAKD_PLUGIN_DB_NAME=hive
+PEAKD_PLUGIN_DB_USER=
+PEAKD_PLUGIN_DB_PWD=
 ```
