@@ -1,6 +1,6 @@
 {
   "name": "peakd-hivemind-plugin",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A small Node.js app for the Hive blockchain providing additional API to Hivemind",
   "author": "asgarth",
   "private": true,

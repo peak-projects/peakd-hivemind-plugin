@@ -17,7 +17,7 @@ export class PostsController {
   }
 
   @Get('/posts')
-  async getPostsByPermlinks(@Query('permlinks') permlinks): Promise<HivePost[]> {
+  async getPostsByPermlinks(@Query('permlinks') permlinks = ''): Promise<HivePost[]> {
     return await this.postsService.postsByPermlinks(permlinks.split(','));
   }
 
