@@ -47,15 +47,24 @@ const POST_SELECT = `SELECT coalesce(v.votes, '[]'::json) as active_votes
   , p.updated_at as updated
   , p.url`;
 
-const FEED_BY_AUTHORS = `WITH posts as (
-  select p.*
-  from hive_posts_api_helper h
-  join hive_posts_view p on p.id = h.id
-  where split_part(h.author_s_permlink, '/', 1) in ('{authors}')
-    and p."depth" = 0
-    and ({start} = 0 or p.id < {start})
-  order by h.id desc
+const FEED_BY_AUTHORS = `WITH authors as (
+  select ha.id
+  from hive_accounts ha
+  where ha.name in ('{authors}')
+),
+helper as (
+  select h.id
+  from authors a
+  join hive_posts h on h.author_id = a.id
+  where h."depth" = 0
+    and ({start} = 0 or h.id < {start})
+  order by h.created_at desc
   limit {limit}
+),
+posts as (
+  select p.*
+  from helper h
+  join hive_posts_view p on p.id = h.id
 )
 ${POST_SELECT}
 FROM posts p
@@ -65,7 +74,7 @@ LEFT JOIN LATERAL(
 	join hive_accounts a on a.id = v.voter_id
 	where v.post_id in (select id from posts)
 	group by v.post_id) as v ON v.post_id = p.id
-order by p.id desc`;
+order by p.created_at desc`;
 
 const POSTS_BY_PERMLINKS = `${POST_SELECT}
 FROM hive_posts_api_helper h
