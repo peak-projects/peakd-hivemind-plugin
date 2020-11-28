@@ -47,7 +47,8 @@ const POST_SELECT = `SELECT coalesce(v.votes, '[]'::json) as active_votes
   , p.updated_at as updated
   , p.url`;
 
-const FEED_BY_AUTHORS = `WITH authors as (
+const FEED_BY_AUTHORS = `
+WITH authors as (
   select ha.id
   from hive_accounts ha
   where ha.name in ('{authors}')
@@ -76,7 +77,8 @@ LEFT JOIN LATERAL(
 	group by v.post_id) as v ON v.post_id = p.id
 order by p.created_at desc`;
 
-const POSTS_BY_PERMLINKS = `${POST_SELECT}
+const POSTS_BY_PERMLINKS = `
+${POST_SELECT}
 FROM hive_posts_api_helper h
 JOIN hive_posts_view p on p.id = h.id
 LEFT JOIN LATERAL(
@@ -87,7 +89,31 @@ LEFT JOIN LATERAL(
 WHERE p.depth = 0
       and h.author_s_permlink in ('{permlinks}')`;
 
-const PAGE_SIZE = 20;
+const POSTS_IN_COMMUNITY_BY_AUTHOR = `
+WITH helper as (
+  select id
+  from hive_posts h
+  where "depth" = 0
+    and author_id = (select id from hive_accounts where "name" = '{author}')
+    and community_id = (select id from hive_communities where "name" = '{community}')
+    and ({start} = 0 or id < {start})
+  order by created_at desc
+  limit {limit}
+),
+posts as (
+  select p.*
+  from helper h
+  join hive_posts_view p on p.id = h.id
+)
+${POST_SELECT}
+FROM posts p
+LEFT JOIN LATERAL(
+  select v.post_id, json_agg(json_build_object('voter', a."name", 'rshares', v.rshares)) as votes
+  from hive_votes v
+  join hive_accounts a on a.id = v.voter_id
+  where v.post_id in (select id from posts)
+  group by v.post_id) as v ON v.post_id = p.id
+order by p.created_at desc`;
 
 @Injectable()
 export class PostsService {
@@ -99,13 +125,30 @@ export class PostsService {
       start: start,
       limit: limit
     });
+
     return await this.sequelize.query(query, {
       model: HivePost
     });
   }
 
   async postsByPermlinks(permlinks: string[]): Promise<HivePost[]> {
-    const query = prepare(POSTS_BY_PERMLINKS, { permlinks: permlinks.join('\',\'') });
+    const query = prepare(POSTS_BY_PERMLINKS, {
+      permlinks: permlinks.join('\',\'')
+    });
+
+    return await this.sequelize.query(query, {
+      model: HivePost
+    });
+  }
+
+  async postsInCommunityByAuthor(author: string, community: string, start: number = 0, limit: number = 20): Promise<HivePost[]> {
+    const query = prepare(POSTS_IN_COMMUNITY_BY_AUTHOR, {
+      author: author,
+      community: community,
+      start: start,
+      limit: limit
+    });
+
     return await this.sequelize.query(query, {
       model: HivePost
     });
