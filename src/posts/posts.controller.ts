@@ -29,8 +29,8 @@ export class PostsController {
   @Get('/communities/:community/:author')
   async getPostInCommunityByAuthor(@Param('community') community, @Param('author') author, @Query('start') start, @Query('limit') limit = 20): Promise<HivePost[]> {
     return await this.postsService.postsInCommunityByAuthor(
-      author,
       community,
+      author,
       start > 0 ? start : 0,
       limit > 0 && limit <= 20 ? limit : 20
     );

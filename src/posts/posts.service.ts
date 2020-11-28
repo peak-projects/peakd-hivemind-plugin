@@ -141,10 +141,10 @@ export class PostsService {
     });
   }
 
-  async postsInCommunityByAuthor(author: string, community: string, start: number = 0, limit: number = 20): Promise<HivePost[]> {
+  async postsInCommunityByAuthor(community: string, author: string, start: number = 0, limit: number = 20): Promise<HivePost[]> {
     const query = prepare(POSTS_IN_COMMUNITY_BY_AUTHOR, {
-      author: author,
       community: community,
+      author: author,
       start: start,
       limit: limit
     });
