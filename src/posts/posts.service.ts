@@ -58,6 +58,8 @@ helper as (
   from authors a
   join hive_posts h on h.author_id = a.id
   where h."depth" = 0
+    and h.counter_deleted = 0
+    and h.created_at > now() - interval '{days} days'
     and ({start} = 0 or h.id < {start})
   order by h.created_at desc
   limit {limit}
@@ -119,11 +121,12 @@ order by p.created_at desc`;
 export class PostsService {
   constructor(private sequelize: Sequelize, @InjectModel(HivePost) private postModel: typeof HivePost) {}
 
-  async feedByAuthors(authors: string[], start: number = 0, limit: number = 20): Promise<HivePost[]> {
+  async feedByAuthors(authors: string[], start: number = 0, limit: number = 20, daysInterval: number = 45): Promise<HivePost[]> {
     const query = prepare(FEED_BY_AUTHORS, {
       authors: authors.join('\',\''),
       start: start,
-      limit: limit
+      limit: limit,
+      days: daysInterval
     });
 
     return await this.sequelize.query(query, {
