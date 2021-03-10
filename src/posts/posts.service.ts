@@ -42,7 +42,7 @@ const POST_SELECT = `SELECT coalesce(v.votes, '[]'::json) as active_votes
   , p.id as post_id
   , p.promoted || ' HBD' as promoted
   , '[]'::json as replies
-  , json_build_object('total_votes', p.total_votes) as stats
+  , json_build_object('total_votes', p.total_votes, 'gray', p.is_muted, 'is_pinned', p.is_pinned) as stats
   , p.title
   , p.updated_at as updated
   , p.url`;
@@ -96,6 +96,7 @@ WITH helper as (
   select id
   from hive_posts h
   where "depth" = 0
+    and is_muted = false
     and author_id = (select id from hive_accounts where "name" = '{author}')
     and community_id = (select id from hive_communities where "name" = '{community}')
     and ({start} = 0 or id < {start})
@@ -117,43 +118,101 @@ LEFT JOIN LATERAL(
   group by v.post_id) as v ON v.post_id = p.id
 order by p.created_at desc`;
 
+const POSTS_IN_COMMUNITY_BY_TAG = `
+WITH helper as (
+  select p.id
+  from hive_posts p
+  where p."depth" = 0
+    and p.is_muted = false
+    and p.community_id = (select id from hive_communities where "name" = '{community}')
+    and (select id from hive_tag_data where tag = '{tag}') = ANY (p.tags_ids)
+    and ({start} = 0 or id < {start})
+  order by created_at desc
+  limit {limit}
+),
+posts as (
+  select p.*
+  from helper h
+  join hive_posts_view p on p.id = h.id
+)
+${POST_SELECT}
+FROM posts p
+LEFT JOIN LATERAL(
+  select v.post_id, json_agg(json_build_object('voter', a."name", 'rshares', v.rshares)) as votes
+  from hive_votes v
+  join hive_accounts a on a.id = v.voter_id
+  where v.post_id in (select id from posts)
+  group by v.post_id) as v ON v.post_id = p.id
+order by p.created_at desc`;
+
 @Injectable()
 export class PostsService {
-  constructor(private sequelize: Sequelize, @InjectModel(HivePost) private postModel: typeof HivePost) {}
+  constructor(
+    private sequelize: Sequelize,
+    @InjectModel(HivePost) private postModel: typeof HivePost,
+  ) {}
 
-  async feedByAuthors(authors: string[], start: number = 0, limit: number = 20, daysInterval: number = 45): Promise<HivePost[]> {
+  async feedByAuthors(
+    authors: string[],
+    start: number = 0,
+    limit: number = 20,
+    daysInterval: number = 45,
+  ): Promise<HivePost[]> {
     const query = prepare(FEED_BY_AUTHORS, {
-      authors: authors.join('\',\''),
+      authors: authors.join("','"),
       start: start,
       limit: limit,
-      days: daysInterval
+      days: daysInterval,
     });
 
     return await this.sequelize.query(query, {
-      model: HivePost
+      model: HivePost,
     });
   }
 
   async postsByPermlinks(permlinks: string[]): Promise<HivePost[]> {
     const query = prepare(POSTS_BY_PERMLINKS, {
-      permlinks: permlinks.join('\',\'')
+      permlinks: permlinks.join("','"),
     });
 
     return await this.sequelize.query(query, {
-      model: HivePost
+      model: HivePost,
     });
   }
 
-  async postsInCommunityByAuthor(community: string, author: string, start: number = 0, limit: number = 20): Promise<HivePost[]> {
+  async postsInCommunityByAuthor(
+    community: string,
+    author: string,
+    start: number = 0,
+    limit: number = 20,
+  ): Promise<HivePost[]> {
     const query = prepare(POSTS_IN_COMMUNITY_BY_AUTHOR, {
       community: community,
       author: author,
       start: start,
-      limit: limit
+      limit: limit,
     });
 
     return await this.sequelize.query(query, {
-      model: HivePost
+      model: HivePost,
+    });
+  }
+
+  async postsInCommunityByTag(
+    community: string,
+    tag: string,
+    start: number = 0,
+    limit: number = 20,
+  ): Promise<HivePost[]> {
+    const query = prepare(POSTS_IN_COMMUNITY_BY_TAG, {
+      community: community,
+      tag: tag,
+      start: start,
+      limit: limit,
+    });
+
+    return await this.sequelize.query(query, {
+      model: HivePost,
     });
   }
 }
